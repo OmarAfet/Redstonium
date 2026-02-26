@@ -1,6 +1,8 @@
 [package]
-name = "Redstonium"
+name = "redstonium"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+gpui = { path = "zed/crates/gpui" }
+gpui_platform = { path = "zed/crates/gpui_platform" }
