@@ -5,5 +5,8 @@ edition = "2024"
 description = "A Minecraft launcher built with Rust and GPUI"
 
 [dependencies]
-gpui = { path = "zed/crates/gpui" }
-gpui_platform = { path = "zed/crates/gpui_platform" }
+gpui = { path = "zed/crates/gpui", features = ["font-kit"] }
+gpui_platform = { path = "zed/crates/gpui_platform", features = ["font-kit"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-text = ">=21.0.0, <21.1.0"
