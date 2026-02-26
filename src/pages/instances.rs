@@ -1,4 +1,4 @@
-use gpui::{div, prelude::*, px};
+use gpui::{div, prelude::*};
 
 use crate::theme::Colors;
 
@@ -9,7 +9,7 @@ impl InstancesPage {
         div()
             .flex()
             .flex_col()
-            .w_full()
+            .size_full()
             .gap_2()
             .child(
                 div()
@@ -21,47 +21,7 @@ impl InstancesPage {
                 div()
                     .text_color(Colors::muted_foreground())
                     .text_sm()
-                    .child("Your installed Minecraft instances."),
+                    .child("No instances installed yet."),
             )
-            .children((0..30).map(|i| {
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .gap_3()
-                    .px_3()
-                    .py_3()
-                    .bg(Colors::sidebar())
-                    .border_1()
-                    .border_color(Colors::border())
-                    .child(
-                        div()
-                            .size(px(40.))
-                            .bg(Colors::secondary())
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .text_sm()
-                            .child(format!("{}", i + 1)),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(Colors::foreground())
-                                    .child(format!("Minecraft 1.{}.{}", 20 - (i % 10), i % 5)),
-                            )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(Colors::muted_foreground())
-                                    .child(if i % 3 == 0 { "Fabric" } else if i % 3 == 1 { "Forge" } else { "Vanilla" }),
-                            ),
-                    )
-            }))
     }
 }

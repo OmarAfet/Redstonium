@@ -94,24 +94,6 @@ impl App {
             ActivePage::Instances => InstancesPage::render().into_any_element(),
             ActivePage::Create => CreatePage::render().into_any_element(),
             ActivePage::Settings => SettingsPage::render().into_any_element(),
-            _ => div()
-                .flex()
-                .flex_col()
-                .size_full()
-                .gap_2()
-                .child(
-                    div()
-                        .text_xl()
-                        .text_color(Colors::foreground())
-                        .child(format!("{:?}", self.active_page)),
-                )
-                .child(
-                    div()
-                        .text_color(Colors::muted_foreground())
-                        .text_sm()
-                        .child("Temporary tab for scroll testing."),
-                )
-                .into_any_element(),
         }
     }
 

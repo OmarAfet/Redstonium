@@ -38,19 +38,6 @@ impl RenderOnce for Sidebar {
             (ActivePage::Instances, "Instances"),
             (ActivePage::Create, "Create"),
             (ActivePage::Settings, "Settings"),
-            // Temporary tabs for scroll testing
-            (ActivePage::TempTab1, "Temp Tab 1"),
-            (ActivePage::TempTab2, "Temp Tab 2"),
-            (ActivePage::TempTab3, "Temp Tab 3"),
-            (ActivePage::TempTab4, "Temp Tab 4"),
-            (ActivePage::TempTab5, "Temp Tab 5"),
-            (ActivePage::TempTab6, "Temp Tab 6"),
-            (ActivePage::TempTab7, "Temp Tab 7"),
-            (ActivePage::TempTab8, "Temp Tab 8"),
-            (ActivePage::TempTab9, "Temp Tab 9"),
-            (ActivePage::TempTab10, "Temp Tab 10"),
-            (ActivePage::TempTab11, "Temp Tab 11"),
-            (ActivePage::TempTab12, "Temp Tab 12"),
         ];
 
         div()
