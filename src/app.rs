@@ -1,8 +1,13 @@
+use std::sync::Arc;
+
 use gpui::{
     AnyElement, Context, DispatchPhase, Entity, MouseButton, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, Pixels, ScrollHandle, Window, canvas, div, fill, point, prelude::*, px,
 };
+use tiny_http::Server;
 
+use crate::auth;
+use crate::auth::types::PlayerProfile;
 use crate::components::sidebar::Sidebar;
 use crate::pages::{ActivePage, create::CreatePage, instances::InstancesPage, settings::SettingsPage};
 use crate::theme::Colors;
@@ -10,8 +15,20 @@ use crate::theme::Colors;
 const SCROLLBAR_WIDTH: f32 = 6.0;
 const SCROLLBAR_MIN_THUMB: f32 = 20.0;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum LoginStatus {
+    Idle,
+    WaitingForBrowser,
+    LoadingProfile,
+}
+
 pub struct App {
     pub(crate) active_page: ActivePage,
+    pub(crate) profile: Option<PlayerProfile>,
+    pub(crate) login_status: LoginStatus,
+    /// Handle to the local HTTP server while waiting for the OAuth redirect.
+    /// Used by the cancel button to call `server.unblock()`.
+    login_server: Option<Arc<Server>>,
     scroll_handle: ScrollHandle,
     is_dragging_scrollbar: bool,
     is_scrollbar_hovered: bool,
@@ -21,14 +38,128 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        // Load any saved profile from disk (non-blocking, just reads a file).
+        let profile = auth::load_account()
+            .ok()
+            .flatten()
+            .map(|account| account.profile);
+
         Self {
             active_page: ActivePage::Instances,
+            profile,
+            login_status: LoginStatus::Idle,
+            login_server: None,
             scroll_handle: ScrollHandle::new(),
             is_dragging_scrollbar: false,
             is_scrollbar_hovered: false,
             drag_start_y: px(0.),
             drag_start_scroll_offset: px(0.),
         }
+    }
+
+    /// Spawn the login flow on a background thread in two phases:
+    /// 1. "Logging in..." — browser opens, waits for redirect
+    /// 2. "Loading profile..." — exchanges tokens and fetches profile
+    pub fn start_login(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.login_status != LoginStatus::Idle {
+            return;
+        }
+        self.login_status = LoginStatus::WaitingForBrowser;
+        cx.notify();
+
+        let background = cx.background_executor().clone();
+
+        cx.spawn(async move |this, cx| {
+            // Start the HTTP server and open the browser on a background thread.
+            let server_result = background
+                .spawn(async move { auth::start_login_server() })
+                .await;
+
+            let server = match server_result {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Login failed: {e}");
+                    this.update(cx, |this, cx| {
+                        this.login_status = LoginStatus::Idle;
+                        cx.notify();
+                    }).ok();
+                    return;
+                }
+            };
+
+            // Store the server handle so cancel_login() can unblock it.
+            let server_clone = server.clone();
+            this.update(cx, |this, cx| {
+                this.login_server = Some(server_clone);
+                cx.notify();
+            }).ok();
+
+            // Wait for the redirect (blocks until code arrives or cancelled).
+            let bg2 = background.clone();
+            let server_for_wait = server.clone();
+            let code_result = bg2
+                .spawn(async move { auth::wait_for_code(&server_for_wait) })
+                .await;
+
+            // Clear the server handle — no longer needed.
+            this.update(cx, |this, _cx| {
+                this.login_server = None;
+            }).ok();
+
+            let code = match code_result {
+                Ok(code) => code,
+                Err(e) => {
+                    eprintln!("Login failed: {e}");
+                    this.update(cx, |this, cx| {
+                        this.login_status = LoginStatus::Idle;
+                        cx.notify();
+                    }).ok();
+                    return;
+                }
+            };
+
+            // Update UI to show "Loading profile..."
+            this.update(cx, |this, cx| {
+                this.login_status = LoginStatus::LoadingProfile;
+                cx.notify();
+            }).ok();
+
+            // Phase 2: exchange tokens + fetch profile
+            let bg3 = background.clone();
+            let result = bg3
+                .spawn(async move { auth::exchange_and_fetch(&code) })
+                .await;
+
+            this.update(cx, |this, cx| {
+                this.login_status = LoginStatus::Idle;
+                match result {
+                    Ok(account) => {
+                        this.profile = Some(account.profile);
+                    }
+                    Err(e) => {
+                        eprintln!("Login failed: {e}");
+                    }
+                }
+                cx.notify();
+            }).ok();
+        })
+        .detach();
+    }
+
+    /// Cancel an in-progress login by unblocking the HTTP server.
+    pub fn cancel_login(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(server) = self.login_server.take() {
+            server.unblock();
+        }
+        self.login_status = LoginStatus::Idle;
+        cx.notify();
+    }
+
+    /// Clear the stored account and reset the UI.
+    pub fn logout(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        let _ = auth::logout();
+        self.profile = None;
+        cx.notify();
     }
 
     fn content_height(&self) -> Pixels {
@@ -177,7 +308,7 @@ impl Render for App {
             .size_full()
             .bg(Colors::background())
             .text_color(Colors::foreground())
-            .child(Sidebar::new(self.active_page, cx))
+            .child(Sidebar::new(self.active_page, self.profile.clone(), self.login_status.clone(), cx))
             .child(
                 div()
                     .flex_1()

@@ -26,4 +26,10 @@ impl Colors {
 
     // Secondary (avatar backgrounds, misc)
     pub fn secondary() -> Rgba { rgb(0x585b70) }
+
+    // Destructive (logout, delete, danger actions)
+    pub fn destructive() -> Rgba { rgb(0xf38ba8) }
+
+    // Destructive hover (brighter red for hover states)
+    pub fn destructive_hover() -> Rgba { rgb(0xff6b8a) }
 }
